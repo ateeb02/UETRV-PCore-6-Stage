@@ -61,7 +61,7 @@ assign data_in   = icache2pf_i.ack ? icache2pf_i.r_data : `INSTR_NOP;
 
 //Icache-MMU Logic to update signals for new address
 assign pf2mmu_o.i_vaddr = if2pf_i.instr_req ? pc_prefetch : 32'b0;
-assign pf2mmu_o.i_req   = (if2pf_i.instr_req & ~(&fifo_valid)) ?`IMEM_INST_REQ : 1'b0; 
+assign pf2mmu_o.i_req   = if2pf_i.instr_req ?`IMEM_INST_REQ : 1'b0; 
 
 //Icache-Prefetch Logic to update signals for new instruction
 assign pf2icache_o.addr = mmu2pf_i.i_paddr[`XLEN-1:0]; // pc_next; 
@@ -71,7 +71,6 @@ assign pf2if_ctrl_o.stall = ~(if2pf_i.clear) & (~icache2pf_i.ack & pf2icache_o.r
 
 //Local signals
 assign fifo_clr = ~rst_n | if2pf_i.clear | mismatch_fault;  //TODO: Clear/stall/flush signals from other stages to be added here
-assign fifo_update = icache2pf_i.ack | fifo_clr;
 
 assign pf2if_ctrl_o.fifo_valid = fifo_valid;
 
@@ -115,7 +114,6 @@ always_comb begin
 
     //State if jump/invalid instruction or reset occurs
     if (fifo_clr) begin
-        fifo_valid = 2'b00;
         pf2if_ctrl_o.ack = 1'b0;
         pc_incr = 4'd0;
         mismatch_fault = 1'b0;
@@ -130,6 +128,7 @@ always_comb begin
             pf2if_ctrl_o.ack = 1'b0;
             mismatch_fault = 1'b1;
         end
+        
     end else begin
         if (value_pc[1] == if2pf_i.pc_ff) begin 
             data_out = fetch_fifo[1];
