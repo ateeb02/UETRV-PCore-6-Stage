@@ -1,1 +1,1 @@
-This is a github repository for an ongoing project for adding 6th stage to the pcore
+This is a github repository for an ongoing project for adding 6th stage to the pcore.
