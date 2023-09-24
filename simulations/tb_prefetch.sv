@@ -67,6 +67,7 @@ module tb_prefetch;
 
 
 		@(negedge clk) 
+		
 		if(pref2icache_o.req & (pref2icache_o.addr == 32'h6))
 			begin 
 				icache2pref_i.ack =1'b1;
@@ -75,6 +76,16 @@ module tb_prefetch;
 			end
 		
 
+		@(negedge clk) begin 
+		if (pref2if_data_o.instr == 32'h00200093) if2pf_i.instr_req=0;
+		end
+
+		@(posedge clk ) begin 
+			if2pf_i.pc_ff =32'h4;
+			if2pf_i.instr_req =1;
+
+
+		end
 		
 
 		
@@ -89,26 +100,26 @@ module tb_prefetch;
 		// mmu2pref_i.i_paddr=32'h4;
 		// mmu2pref_i.i_hit=1'b1;
 		// mmu2pref_i.i_page_fault=1'b0;
-		// @(posedge clk);
-		// if2pf_i.pc_ff=32'h6;
-		// if2pf_i.instr_req =1'b1;
-		// if2pf_i.is_comp =1'b1;
-		// if2pf_i.clear =1'b0;
+		@(posedge clk);
+		if2pf_i.pc_ff=32'h6;
+		if2pf_i.instr_req =1'b1;
+		if2pf_i.is_comp =1'b1;
+		if2pf_i.clear =1'b0;
 
-		// icache2pref_i.r_data=32'h002081B3;
-		// icache2pref_i.ack=1'b1;
-		// mmu2pref_i.i_paddr=32'h6;
-		// mmu2pref_i.i_hit=1'b1;
-		// mmu2pref_i.i_page_fault=1'b0;
-		// @(posedge clk);
-		// if2pf_i.pc_ff=32'hA;
-		// if2pf_i.instr_req =1'b1;
-		// if2pf_i.is_comp =1'b0;
-		// if2pf_i.clear =1'b0;
+		icache2pref_i.r_data=32'h002081B3;
+		icache2pref_i.ack=1'b1;
+		mmu2pref_i.i_paddr=32'h6;
+		mmu2pref_i.i_hit=1'b1;
+		mmu2pref_i.i_page_fault=1'b0;
+		@(posedge clk);
+		if2pf_i.pc_ff=32'hA;
+		if2pf_i.instr_req =1'b1;
+		if2pf_i.is_comp =1'b0;
+		if2pf_i.clear =1'b0;
 
-		// mmu2pref_i.i_paddr=32'hA;
-		// mmu2pref_i.i_hit=1'b1;
-		// mmu2pref_i.i_page_fault=1'b0;
+		mmu2pref_i.i_paddr=32'hA;
+		mmu2pref_i.i_hit=1'b1;
+		mmu2pref_i.i_page_fault=1'b0;
 	end
 endmodule
 

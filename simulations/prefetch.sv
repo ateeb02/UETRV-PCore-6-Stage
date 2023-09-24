@@ -39,10 +39,11 @@ module prefetch (
 
 //FLip-flops declarations
 logic   [`XLEN-1:0]     fetch_fifo      [2]; //fifo direction from 0 to 1
+logic   [`XLEN-1:0]     pc_fifo         [2];
 logic         [1:0]     fifo_valid;
 logic   [`XLEN-1:0]     data_out;
 logic   [`XLEN-1:0]     data_in;
-logic   [`XLEN-1:0]     pc_fifo;
+logic   [`XLEN-1:0]     pc_fifo_2mmu;
 
 
 logic   [`XLEN-1:0]     pc_incr;
@@ -59,7 +60,7 @@ assign pf2if_data_o.instr = data_out;
 assign data_in   = icache2pf_i.ack ? icache2pf_i.r_data : `INSTR_NOP;
 
 //Icache-MMU Logic to update signals for new address
-assign pf2mmu_o.i_vaddr = if2pf_i.instr_req ? pc_fifo : 32'b0;
+assign pf2mmu_o.i_vaddr = if2pf_i.instr_req ? pc_fifo_2mmu : 32'b0;
 assign pf2mmu_o.i_req   = (if2pf_i.instr_req & ~(&fifo_valid)) ?`IMEM_INST_REQ : 1'b0; 
 
 //Icache-Prefetch Logic to update signals for new instruction
@@ -110,8 +111,11 @@ always_comb begin
         pf2if_ctrl_o.ack = &fifo_valid;
         pc_incr = 32'd2; 
     end else begin
-        data_out = fetch_fifo[1];
-        pf2if_ctrl_o.ack = fifo_valid[1];
+       if (pc_fifo[1]== if2pf_i.pc_ff) begin 
+            data_out = fetch_fifo[1];
+            pf2if_ctrl_o.ack = fifo_valid[1];
+       end
+       else pf2if_ctrl_o.ack =1'b0;
         pc_incr = 32'd4;
     end
 end
@@ -119,9 +123,9 @@ end
 
 always_comb begin 
      
-     if (fifo_clr | (fifo_valid == 2'b0))  pc_fifo = if2pf_i.pc_ff ;
-     else if (fifo_valid == 2'b01)  pc_fifo = if2pf_i.pc_ff + pc_incr;
-     else if (pc_hword) pc_fifo = if2pf_i.pc_ff - pc_incr;
+     if (fifo_clr | (fifo_valid == 2'b0))  pc_fifo_2mmu = if2pf_i.pc_ff ;
+     else if (fifo_valid == 2'b01)  pc_fifo_2mmu = if2pf_i.pc_ff + pc_incr;
+     else if (pc_hword) pc_fifo_2mmu = if2pf_i.pc_ff - pc_incr;
 
     end
     
@@ -135,10 +139,17 @@ always_ff @ (posedge clk, negedge rst_n) begin
         
         fifo_valid[1] <= 1'b0;
         fifo_valid[0] <= 1'b0;
+
+        pc_fifo [1]<=32'b0;
+        pc_fifo [0]<=32'b0;
+
    end
     else begin 
     //FIFO updating at each cycle
-    if (fifo_update) begin
+    if (if2pf_i.instr_req & (&fifo_valid)) begin // we clear the fifo 1 after we have read from it to be sent to fetch stage, this allows us to update teh fifo and also fetch the 2nd instruction after the cleared one
+        fifo_valid[1]<=1'b0;
+    end 
+    else if (fifo_update & ~(&fifo_valid)) begin
         //Updating the fifo
         fetch_fifo[1] <= fetch_fifo[0];
         fetch_fifo[0] <= data_in;
@@ -146,7 +157,14 @@ always_ff @ (posedge clk, negedge rst_n) begin
         fifo_valid[1] <= fifo_valid[0];
         fifo_valid[0] <= icache2pf_i.ack;
 
-    end else begin
+        pc_fifo[1]<=pc_fifo[0];
+        pc_fifo[0]<=pf2mmu_o.i_vaddr;
+    
+    end 
+    
+
+    
+    else begin
         //Retaining the values in case if instr request is not made by the fetch
         fetch_fifo[1] <= fetch_fifo[1];
         fetch_fifo[0] <= fetch_fifo[0];
@@ -154,6 +172,9 @@ always_ff @ (posedge clk, negedge rst_n) begin
         fifo_valid[1] <= fifo_valid[1];
         fifo_valid[0] <= fifo_valid[0];
         
+        pc_fifo[1]<=pc_fifo[1];
+        pc_fifo[0]<=pc_fifo[0];
+
     end
     end
 end
