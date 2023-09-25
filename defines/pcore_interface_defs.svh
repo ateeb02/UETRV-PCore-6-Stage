@@ -15,6 +15,7 @@
 `include "pcore_csr_defs.svh"
 `include "a_ext_defs.svh"
 
+
 //============================== ISA related definitions ================================//
 
 typedef enum logic [4:0] {
@@ -157,6 +158,29 @@ typedef struct packed {
     logic [`XLEN-1:0]                r_data;
     logic                            ack;  
 } type_imem2if_s;
+
+
+// PreFetch-2-Fetch data signals
+typedef struct packed {
+    logic [`XLEN-1:0]                instr;
+} type_pf2if_data_s;
+
+// PreFetch-2-Fetch control signals
+typedef struct packed {
+    //logic                           exc_req;
+    logic       [1:0]               fifo_valid;
+    logic                           stall;
+    logic                           ack;
+} type_pf2if_ctrl_s;
+
+// Fetch-2-Prefetch signals
+typedef struct packed {
+    logic [`XLEN-1:0]               pc_ff;
+    logic                           instr_req;
+    logic                           is_comp;
+    logic                           clear;
+} type_if2pf_s;
+
 
 
 // Fetch-2-Decode data signals

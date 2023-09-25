@@ -13,8 +13,8 @@
 
 `include "pcore_interface_defs.svh"
 
-parameter int unsigned TLB_ENTRIES = 8;
-parameter int unsigned DTLB_ENTRIES = 8;
+parameter int unsigned TLB_ENTRIES = 4;
+parameter int unsigned DTLB_ENTRIES = 16;
 parameter int unsigned DTLB_WIDTH = $clog2(DTLB_ENTRIES);
 
 typedef enum logic [1:0] {
@@ -89,8 +89,7 @@ typedef struct packed {
     logic                            en_vaddr;
     logic                            en_ld_st_vaddr;
     logic                            mxr; 
-    logic                            lsu_flush_req;
-    logic                            i_kill_req;
+    logic                            flush_req;
 
     // Signals from LSU/DTLB
     logic [`VALEN-1:0]               dtlb_vaddr; 
@@ -101,7 +100,7 @@ typedef struct packed {
     // Signals from IF/ITLB
     logic [`VALEN-1:0]               itlb_vaddr; 
     logic                            itlb_req;
-    logic                            itlb_hit;
+    logic                            itlb_hit; 
 } type_mmu2ptw_s;
 
 typedef struct packed {
@@ -140,8 +139,7 @@ typedef struct packed {
 // Address translation request from IF module to MMU
 typedef struct packed {                            
     logic [`XLEN-1:0]                i_vaddr;
-    logic                            i_req;
-    logic                            i_kill;
+    logic                            i_req;  
 } type_if2mmu_s;
 
 // Address translation response from MMU to IF module 
@@ -154,8 +152,7 @@ typedef struct packed {
 // Data request from MMU to Dcache
 typedef struct packed {                            
     logic [`XLEN-1:0]                paddr;
-    logic                            r_req; 
-    logic                            flush_req; 
+    logic                            r_req;  
 } type_mmu2dcache_s;
 
 // Response from Dcache to MMU 

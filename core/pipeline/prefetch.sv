@@ -94,7 +94,7 @@ assign pc_hword  = if2pf_i.pc_ff[1];
 
 //Combinational block to handle fifo updating
 always_comb begin
-    if ((icache2pf_i.ack & if2pf_i.req) | fifo_clr) begin
+    if ((icache2pf_i.ack & if2pf_i.instr_req) | fifo_clr) begin
         fifo_update = (if2pf_i.is_comp & ~pc_hword) ? 1'b0 : 1'b1;
     end else begin
         fifo_update = 1'b0;
@@ -103,14 +103,14 @@ end
 
 //Combinational block to manage fifo signals
 always_comb begin
-    pc_prefetch = if2pf_i.pc_ff + pc_incr;
+    
     
     // In case of any jump or reset, the fifo will be cleared.
     // In this case it'll stall the pipeline and fill the fifo first,
     // at the expense of extra clock cycle(s).
-    if (~(fifo_valid[1])) begin
-        pc_incr = fifo_valid[0] ? 4'd0 : 4'd4;
-    end
+    // if (~(fifo_valid[1])) begin
+    //     pc_incr = fifo_valid[0] ? 4'd0 : 4'd4;
+    // end
 
     //State if jump/invalid instruction or reset occurs
     if (fifo_clr) begin
@@ -119,26 +119,51 @@ always_comb begin
         mismatch_fault = 1'b0;
     end
 
-    if (pc_hword) begin
-        if (value_pc[1] == (if2pf_i.pc_ff - 2'd2)) begin
-            data_out = {fetch_fifo[0][31:16], fetch_fifo[1][15:0]};
-            pf2if_ctrl_o.ack = &fifo_valid;
-            pc_incr = 4'd6; 
+    if (&fifo_valid) begin 
+            
+        if (pc_hword) begin
+            if (value_pc[1] == (if2pf_i.pc_ff - 2'd2)) begin
+                data_out = {fetch_fifo[0][31:16], fetch_fifo[1][15:0]};
+                pf2if_ctrl_o.ack = &fifo_valid;
+                pc_incr = 4'd6; 
+            end else begin
+                pf2if_ctrl_o.ack = 1'b0;
+                mismatch_fault = 1'b1;
+            end
+            
         end else begin
-            pf2if_ctrl_o.ack = 1'b0;
-            mismatch_fault = 1'b1;
-        end
-        
-    end else begin
-        if (value_pc[1] == if2pf_i.pc_ff) begin 
-            data_out = fetch_fifo[1];
-            pf2if_ctrl_o.ack = fifo_valid[1];
-            pc_incr = 4'd8;
-        end else begin
-            pf2if_ctrl_o.ack = 1'b0;
-            mismatch_fault = 1'b1;
+            if (value_pc[1] == if2pf_i.pc_ff) begin 
+                data_out = fetch_fifo[1];
+                pf2if_ctrl_o.ack = fifo_valid[1];
+                pc_incr = 4'd8;
+            end else begin
+                pf2if_ctrl_o.ack = 1'b0;
+                mismatch_fault = 1'b1;
+            end
         end
     end
+        else begin
+                if (pc_hword) begin
+                    if (value_pc[1] == (if2pf_i.pc_ff - 2'd2)) begin
+                        data_out = {fetch_fifo[0][31:16], fetch_fifo[1][15:0]};
+                        pf2if_ctrl_o.ack = &fifo_valid;
+                        pc_incr = 4'd2; 
+                    end else begin
+                        pf2if_ctrl_o.ack = 1'b0;
+                        mismatch_fault = 1'b1;
+                    end
+                    
+                end 
+        
+    else begin
+            if (~fifo_valid[0])  pc_incr = 4'd0;
+               
+            else if (fifo_valid[0]  & ~fifo_valid[1] )  pc_incr = 4'd4;
+        end
+    end
+        
+    
+    pc_prefetch = if2pf_i.pc_ff + pc_incr;
 end
 
 //FIFO Flip-FLop logic
