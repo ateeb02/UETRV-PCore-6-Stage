@@ -90,7 +90,7 @@ assign pc_hword  = if2pf_i.pc_ff[1];
 
 // Combinational logic to manage fifo clearing
 always_comb begin
-    if (~rst_n | if2pf_i.clear | mismatch_fault) begin
+    if (if2pf_i.clear | mismatch_fault) begin
         fifo_clr = 1'b1;
     end else begin
         fifo_clr = 1'b0;
@@ -165,10 +165,10 @@ end
 
 
 //FIFO Flip-FLop logic
-always_ff @ (posedge clk, negedge rst_n) begin
+    always_ff @ (posedge clk, negedge rst_n) begin
 
     //Reset state is managed with fifo_clr
-    if (fifo_clr) begin
+    if (~rst_n | fifo_clr) begin
         fetch_fifo[1] <= `INSTR_NOP;            //32-bit fifo registers
         fetch_fifo[0] <= `INSTR_NOP;            //32-bit fifo registers
         
