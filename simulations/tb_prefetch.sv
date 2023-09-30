@@ -61,7 +61,7 @@ module tb_prefetch;
 		//--------------Cycle 1--------------
 		@(posedge clk);
 
-		if2pf.pc_ff = if2pf.pc_ff;
+		if2pf.pc_ff = pf2if_ctrl_c.ack ? if2pf.pc_ff + 4 : if2pf.pc_ff;
 		if2pf.req = 1'b1;
 		if2pf.is_comp = 1'b0;
 		if2pf.clear = 1'b0;
@@ -78,7 +78,7 @@ module tb_prefetch;
 
 		hword = 1'b0;
 
-		if2pf.pc_ff = if2pf.pc_ff + 4;
+		if2pf.pc_ff = pf2if_ctrl_c.ack ? if2pf.pc_ff + 4 : if2pf.pc_ff;
 		if2pf.req = 1'b1;
 		if2pf.is_comp = 1'b0;
 		if2pf.clear = 1'b0;
@@ -93,7 +93,7 @@ module tb_prefetch;
 		//--------------Cycle 3--------------
 		@(posedge clk);
 
-		if2pf.pc_ff = if2pf.pc_ff + 4;
+		if2pf.pc_ff = pf2if_ctrl_c.ack ? if2pf.pc_ff + 4 : if2pf.pc_ff;
 		if2pf.req = 1'b1;
 		if2pf.is_comp = 1'b0;
 		if2pf.clear = 1'b0;
@@ -108,7 +108,7 @@ module tb_prefetch;
 		//--------------Cycle 4--------------
 		@(posedge clk);
 
-		if2pf.pc_ff = if2pf.pc_ff + 4;
+		if2pf.pc_ff = pf2if_ctrl_c.ack ? if2pf.pc_ff + 4 : if2pf.pc_ff;
 		if2pf.req = 1'b1;
 		if2pf.is_comp = 1'b0;
 		if2pf.clear = 1'b0;
@@ -123,7 +123,7 @@ module tb_prefetch;
 		//--------------Cycle 5--------------
 		@(posedge clk);
 
-		if2pf.pc_ff = if2pf.pc_ff + 4;
+		if2pf.pc_ff = pf2if_ctrl_c.ack ? if2pf.pc_ff + 4 : if2pf.pc_ff;
 		if2pf.req = 1'b1;
 		if2pf.is_comp = 1'b0;
 		if2pf.clear = 1'b0;
@@ -138,7 +138,7 @@ module tb_prefetch;
 		//--------------Cycle 6--------------
 		@(posedge clk);
 
-		if2pf.pc_ff = if2pf.pc_ff + 4;
+		if2pf.pc_ff = pf2if_ctrl_c.ack ? if2pf.pc_ff + 4 : if2pf.pc_ff;
 		if2pf.req = 1'b1;
 		if2pf.is_comp = 1'b0;
 		if2pf.clear = 1'b0;
