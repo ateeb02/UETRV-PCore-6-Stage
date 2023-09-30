@@ -176,7 +176,7 @@ typedef struct packed {
 // Fetch-2-Prefetch signals
 typedef struct packed {
     logic [`XLEN-1:0]               pc_ff;
-    logic                           instr_req;
+    logic                           req;
     logic                           is_comp;
     logic                           clear;
 } type_if2pf_s;
