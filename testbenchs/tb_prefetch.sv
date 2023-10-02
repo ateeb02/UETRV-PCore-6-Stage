@@ -105,6 +105,26 @@ module tb_prefetch;
 		//--------------Cycle 3--------------
 
 
+	repeat (14) begin 
+		@(posedge clk); begin 
+
+		hword = 1'b0;
+
+		if2pf.pc_ff = hword ? if2pf.pc_ff + 2 : if2pf.pc_ff + 4;
+		if2pf.instr_req = 1'b1;
+		if2pf.is_comp = 1'b0;
+		if2pf.clear = 1'b0;
+
+		mmu2pf.i_paddr = pf2mmu_c.i_req ? if2pf.pc_ff : 32'h0;
+		mmu2pf.i_hit = 1'b1; 
+		mmu2pf.i_page_fault = 1'b0;
+
+		icache2pf.r_data = pf2icache_c.req ? pf2icache_c.addr : 32'h2020_2020;
+		icache2pf.ack = 1'b1;
+		end 
+	end
+
+
 	end
 
 
