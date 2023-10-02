@@ -61,6 +61,9 @@ module pipeline_top (
 
 // Local signals
 
+type_pf2if_data_s                       pf2if_data, pf2if_data_next;
+type_pf2if_ctrl_s                       pf2if_ctrl, pf2if_ctrl_next;
+
 type_if2id_data_s                       if2id_data, if2id_data_next;
 type_if2id_ctrl_s                       if2id_ctrl, if2id_ctrl_next;
 
@@ -111,6 +114,8 @@ type_csr2id_fb_s                        csr2id_fb;
 type_exe2if_fb_s                        exe2if_fb;
 type_wrb2id_fb_s                        wrb2id_fb;
 
+type_if2pf_s                            if2pf;
+
 logic [`XLEN-1:0]                       lsu2exe_fb_alu_result;
 logic [`XLEN-1:0]                       wrb2exe_fb_rd_data;
 logic                                   if2fwd_stall;
@@ -144,6 +149,57 @@ assign mmu2lsu   = mmu2lsu_i;
 assign icache2if = icache2if_i;
 
 
+//================================= Prefetch to Fetch interface ==================================//
+prefetch prefetch_module(
+    .rst_n                      (rst_n),
+    .clk                        (clk),
+
+    .pf2if_ctrl_o               (pf2if_ctrl),
+    .pf2if_data_o               (pf2if_data),
+    .if2pf_i                    (if2pf),
+
+    .pf2icache_o                (if2icache),     // Instruction cache memory request
+    .icache2pf_i                (icache2if),     // Instruction cache memory response
+
+    .pf2mmu_o                   (if2mmu),        // Instruction memory request
+    .mmu2pf_i                   (mmu2if)         // Instruction memory response
+);
+
+
+
+// Prefetch <-----> Fetch pipeline/nopipeline  
+`ifdef PF2IF_PIPELINE_STAGE
+type_pf2if_data_s                       pf2if_data_pipe_ff;
+type_pf2if_ctrl_s                       pf2if_ctrl_pipe_ff;
+
+always_ff @(posedge clk) begin
+    if (~rst_n) begin
+        pf2if_data_pipe_ff.instr <= `INSTR_NOP;
+        pf2if_ctrl_pipe_ff <= '0;
+
+    end else begin
+        pf2if_data_pipe_ff <= pf2if_data_next;
+        pf2if_ctrl_pipe_ff <= pf2if_ctrl_next;
+        
+    end
+end
+
+always_comb begin
+    pf2if_data_next = pf2if_data;
+    pf2if_ctrl_next = pf2if_ctrl;
+
+    if (fwd2ptop.if2id_pipe_flush) begin
+        pf2if_data_next.instr         = `INSTR_NOP;
+        pf2if_ctrl_next               = '0;
+
+    end else if (fwd2ptop.if2id_pipe_stall) begin
+        pf2if_data_next = pf2if_data_pipe_ff;
+        pf2if_ctrl_next = pf2if_ctrl_pipe_ff;
+    end   
+end 
+`endif // PF2IF_PIPELINE_STAGE
+
+
 //================================= Fetch to decode interface ==================================//
 
 // Instruction Fetch module instantiation
@@ -152,6 +208,10 @@ fetch fetch_module (
     .clk                        (clk),
 
     // IF module interface signals 
+    .if2pf_o                    (if2pf),
+    .pf2if_ctrl_i               (pf2if_ctrl_pipe_ff),
+    .pf2if_data_i               (pf2if_data_pipe_ff),
+
     .if2icache_o                (if2icache),
     .icache2if_i                (icache2if),
 
@@ -205,6 +265,8 @@ end
 `endif // IF2ID_PIPELINE_STAGE
 
 
+//================================= Decode to execute interface ==================================//
+
 // Instruction Decode module instantiation
 decode decode_module (
     .rst_n                      (rst_n),
@@ -226,7 +288,6 @@ decode decode_module (
 );
 
 
-//================================= Decode to execute interface ==================================//
 // Decode <-----> Execute pipeline/nopipeline  
 `ifdef ID2EXE_PIPELINE_STAGE
 type_id2exe_data_s                      id2exe_data_pipe_ff;
