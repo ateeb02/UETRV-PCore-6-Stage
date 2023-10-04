@@ -6,7 +6,6 @@
 //
 // Author: Ateeb Tahir, RA @ DDRC UET Lahore
 // Date: 25.8.2023
-// Last update: 04.10.2023
 
 
 
@@ -39,7 +38,7 @@ module prefetch (
 
 
 logic   [`XLEN-1:0]     fetch_fifo      [2]; //fifo direction from 0 to 1
-logic   [`XLEN-1:0]     value_pc        [2];
+
 logic         [1:0]     fifo_valid;
 logic   [`XLEN-1:0]     data_out;
 logic   [`XLEN-1:0]     data_in;
@@ -49,7 +48,7 @@ logic   [`XLEN-1:0]     pc_prefetch;
 logic         [3:0]     pc_incr;
 logic                   pc_hword;
 
-logic                   fifo_clr;
+logic                   flush;
 logic                   fifo_update;
 
 logic                   mismatch_fault;
@@ -68,9 +67,9 @@ assign pf2mmu_o.i_req   = if2pf_i.instr_req ?`IMEM_INST_REQ : 1'b0;
 assign pf2icache_o.addr = mmu2pf_i.i_paddr[`XLEN-1:0]; // pc_next; 
 assign pf2icache_o.req  = mmu2pf_i.i_hit;              // `IMEM_INST_REQ;
 
-assign pf2if_ctrl_o.stall = ~fifo_valid[1] | mismatch_fault;
+//assign pf2if_ctrl_o.stall = ~fifo_valid[1] | mismatch_fault;
 
-assign pf2if_ctrl_o.fifo_valid = fifo_valid;
+//assign pf2if_ctrl_o.fifo_valid = fifo_valid;
 
 //If PC is halfword it'll align it to the next 4th multiple
 assign pc_hword  = if2pf_i.pc_ff[1];
@@ -81,25 +80,25 @@ assign pc_hword  = if2pf_i.pc_ff[1];
 //
 // The FIFO implemented here has 2 full-word entries, but the instructions 
 // in each entry might be half-word aligned (due to compressed instructions), 
-// Therefore in case of C instructions, we concatenate the parts of both entries,
+// Therefore to access them properly, we concatenate the parts of both entries,
 // as shown in the example below:
 // Index        | 31                    16 | 15                     0 |
 // FIFO entry 0 | Instr 1 [15:0]  32bit    | Instr 0 [15:0]  16bit    |
 // FIFO entry 1 | Instr 2 [15:0]  unknown  | Instr 1 [31:16] 32bit    |
 
 
-// Combinational logic to manage fifo clearing
+// Combinational logic to manage fifo flushing
 always_comb begin
-    if (~rst_n | if2pf_i.clear | mismatch_fault) begin
-        fifo_clr = 1'b1;
+    if (~rst_n | if2pf_i.flush | mismatch_fault) begin
+        flush = 1'b1;
     end else begin
-        fifo_clr = 1'b0;
+        flush = 1'b0;
     end
 end
 
 // Combinational logic to handle fifo updating
 always_comb begin
-    if ((icache2pf_i.ack & if2pf_i.instr_req) | fifo_clr ) begin
+    if (icache2pf_i.ack & if2pf_i.req) begin
         fifo_update = (if2pf_i.is_comp & ~pc_hword) ? 1'b0 : 1'b1;
     end else begin
         fifo_update = 1'b0;
@@ -111,68 +110,34 @@ always_comb begin
 
     //Note: this pc is different from the actual pc from the fetch stage
     
-
-    // In case of any jump or reset, the fifo will be cleared.
+    // In case of any jump or reset, the fifo will be flushed.
     // In this case it'll stall the pipeline and fill the fifo first,
     // at the expense of extra clock cycle(s).
-    if (fifo_valid != 2'b11) begin
-        if (fifo_valid[1] & ~fifo_valid[0]) begin               //fifo_valid == 10
-            data_out            = fetch_fifo[1];
-            pf2if_ctrl_o.ack    = fifo_valid[1];
-            pc_incr             = 4'd0;
-            mismatch_fault      = 1'b1;
-        end else if (~fifo_valid[1] & fifo_valid[0]) begin      //fifo_valid == 01
+    if (fifo_valid < 2'b10) begin
+        if (fifo_valid == 2'b01) begin      //fifo_valid == 01
             data_out            = `INSTR_NOP;
             pf2if_ctrl_o.ack    = 1'b0;
             pc_incr             = 4'd4;
             mismatch_fault      = 1'b0;
-        end else begin                                          //fifo_valid == 00
+        end else begin
             data_out            = `INSTR_NOP;
             pf2if_ctrl_o.ack    = 1'b0;
             pc_incr             = 4'd0;
             mismatch_fault      = 1'b0;
         end
 
-    end else begin                                              //fifo_valid == 11
+    end else begin
         if (pc_hword) begin
-            if (value_pc[1] == (if2pf_i.pc_ff - 2'd2)) begin
-                data_out            = {fetch_fifo[0][31:16], fetch_fifo[1][15:0]};
-                pf2if_ctrl_o.ack    = &fifo_valid;
-                pc_incr             = 4'd6; 
-                mismatch_fault      = 1'b0;
-                /*
-            end else if (value_pc[0] == (if2pf_i.pc_ff - 2'd2)) begin
-                data_out            = {fetch_fifo[0][31:16], fetch_fifo[1][15:0]};
-                pf2if_ctrl_o.ack    = &fifo_valid;
-                pc_incr             = 4'd6; 
-                mismatch_fault      = 1'b0;
-                */
-            end else begin
-                data_out            = `INSTR_NOP;
-                pf2if_ctrl_o.ack    = 1'b0;
-                pc_incr             = 4'd0;
-                mismatch_fault      = 1'b1;
-            end
+            data_out            = {fetch_fifo[0][31:16], fetch_fifo[1][15:0]};
+            pf2if_ctrl_o.ack    = &fifo_valid;
+            pc_incr             = 4'd6; 
+            mismatch_fault      = 1'b0;
 
         end else begin
-            if (value_pc[1] == if2pf_i.pc_ff) begin 
-                data_out            = fetch_fifo[1];
-                pf2if_ctrl_o.ack    = fifo_valid[1];
-                pc_incr             = 4'd8;
-                mismatch_fault      = 1'b0;
-                /*
-            end else if (value_pc[0] == if2pf_i.pc_ff) begin 
-                data_out            = fetch_fifo[1];
-                pf2if_ctrl_o.ack    = fifo_valid[1];
-                pc_incr             = 4'd8;
-                mismatch_fault      = 1'b0;
-                */
-            end else begin
-                data_out            = `INSTR_NOP;
-                pf2if_ctrl_o.ack    = 1'b0;
-                pc_incr             = 4'd0;
-                mismatch_fault      = 1'b1;
-            end
+            data_out            = fetch_fifo[1];
+            pf2if_ctrl_o.ack    = fifo_valid[1];
+            pc_incr             = 4'd8;
+            mismatch_fault      = 1'b0;
         end
     end
     pc_prefetch = if2pf_i.pc_ff + pc_incr;
@@ -181,16 +146,13 @@ end
 //FIFO Flip-FLop logic
 always_ff @ (posedge clk, negedge rst_n) begin
 
-    //Reset state is included with fifo_clr
-    if (fifo_clr) begin
+    //Reset state is included with flush
+    if (flush | ~rst_n) begin
         fetch_fifo[1] <= `INSTR_NOP;            //32-bit fifo registers
         fetch_fifo[0] <= `INSTR_NOP;            //32-bit fifo registers
         
         fifo_valid[1] <= 1'b0;                  //valid bits
         fifo_valid[0] <= 1'b0;                  //valid bits
-
-        value_pc[1]   <= `PC_RESET;             //32-bit PC registers
-        value_pc[0]   <= `PC_RESET;             //32-bit PC registers
 
     //FIFO updating at each cycle
     end else if (fifo_update) begin
@@ -200,9 +162,6 @@ always_ff @ (posedge clk, negedge rst_n) begin
         fifo_valid[1] <= fifo_valid[0];         //valid bits
         fifo_valid[0] <= icache2pf_i.ack;       //valid bits
 
-        value_pc[1]   <= value_pc[0];           //32-bit PC registers
-        value_pc[0]   <= pf2mmu_o.i_vaddr;      //32-bit PC registers
-
     //Retains the values in case if instr request is not made by IF
     end else begin
         fetch_fifo[1] <= fetch_fifo[1];         //32-bit fifo registers
@@ -211,8 +170,6 @@ always_ff @ (posedge clk, negedge rst_n) begin
         fifo_valid[1] <= fifo_valid[1];         //valid bits
         fifo_valid[0] <= fifo_valid[0];         //valid bits
         
-        value_pc[1]   <= value_pc[1];           //32-bit PC registers
-        value_pc[0]   <= value_pc[0];           //32-bit PC registers
     end
 end
 
